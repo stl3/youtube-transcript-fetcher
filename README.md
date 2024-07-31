@@ -72,7 +72,7 @@ To see all available options:
 
 3. Fetch transcript without 'Text: ' prefix:
    ```
-   ./youtube-transcript-fetcher -videoId=dQw4w9WgXcQ -noTextPrefix
+   ./youtube-transcript-fetcher -videoId=dQw4w9WgXcQ -showDuration=false -showOffset=false -showLang=false -noTextPrefix=true
    ```
 
 ## Error Handling
