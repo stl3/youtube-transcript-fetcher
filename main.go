@@ -63,33 +63,43 @@ type TranscriptResponse struct {
 
 type YoutubeTranscript struct{}
 
-func (yt *YoutubeTranscript) FetchTranscript(videoId string, config *TranscriptConfig) ([]TranscriptResponse, error) {
+func (yt *YoutubeTranscript) FetchTranscript(videoId string, config *TranscriptConfig) ([]TranscriptResponse, string, error) {
 	identifier, err := retrieveVideoId(videoId)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	videoPageURL := fmt.Sprintf("https://www.youtube.com/watch?v=%s", identifier)
 	videoPageResponse, err := http.Get(videoPageURL)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer videoPageResponse.Body.Close()
 
 	videoPageBody, err := ioutil.ReadAll(videoPageResponse.Body)
 	if err != nil {
-		return nil, err
+		return nil, "", err
+	}
+
+	// Extract video title
+	titleRegex := regexp.MustCompile(`<title>(.+?) - YouTube</title>`)
+	titleMatch := titleRegex.FindSubmatch(videoPageBody)
+	var videoTitle string
+	if len(titleMatch) > 1 {
+		videoTitle = string(titleMatch[1])
+	} else {
+		videoTitle = "Untitled Video"
 	}
 
 	splittedHTML := strings.Split(string(videoPageBody), `"captions":`)
 	if len(splittedHTML) <= 1 {
 		if strings.Contains(string(videoPageBody), `class="g-recaptcha"`) {
-			return nil, &YoutubeTranscriptTooManyRequestError{YoutubeTranscriptError{Message: "YouTube is receiving too many requests from this IP and now requires solving a captcha to continue"}}
+			return nil, "", &YoutubeTranscriptTooManyRequestError{YoutubeTranscriptError{Message: "YouTube is receiving too many requests from this IP and now requires solving a captcha to continue"}}
 		}
 		if !strings.Contains(string(videoPageBody), `"playabilityStatus":`) {
-			return nil, &YoutubeTranscriptVideoUnavailableError{YoutubeTranscriptError{Message: fmt.Sprintf("The video is no longer available (%s)", videoId)}, videoId}
+			return nil, "", &YoutubeTranscriptVideoUnavailableError{YoutubeTranscriptError{Message: fmt.Sprintf("The video is no longer available (%s)", videoId)}, videoId}
 		}
-		return nil, &YoutubeTranscriptDisabledError{YoutubeTranscriptError{Message: fmt.Sprintf("Transcript is disabled on this video (%s)", videoId)}, videoId}
+		return nil, "", &YoutubeTranscriptDisabledError{YoutubeTranscriptError{Message: fmt.Sprintf("Transcript is disabled on this video (%s)", videoId)}, videoId}
 	}
 
 	var captions struct {
@@ -105,11 +115,11 @@ func (yt *YoutubeTranscript) FetchTranscript(videoId string, config *TranscriptC
 	err = json.Unmarshal([]byte(captionsData), &captions)
 	if err != nil {
 		fmt.Println("Error unmarshalling captions data:", err)
-		return nil, &YoutubeTranscriptDisabledError{YoutubeTranscriptError{Message: fmt.Sprintf("Transcript is disabled on this video (%s)", videoId)}, videoId}
+		return nil, "", &YoutubeTranscriptDisabledError{YoutubeTranscriptError{Message: fmt.Sprintf("Transcript is disabled on this video (%s)", videoId)}, videoId}
 	}
 
 	if len(captions.PlayerCaptionsTracklistRenderer.CaptionTracks) == 0 {
-		return nil, &YoutubeTranscriptNotAvailableError{YoutubeTranscriptError{Message: fmt.Sprintf("No transcripts are available for this video (%s)", videoId)}, videoId}
+		return nil, "", &YoutubeTranscriptNotAvailableError{YoutubeTranscriptError{Message: fmt.Sprintf("No transcripts are available for this video (%s)", videoId)}, videoId}
 	}
 
 	var transcriptURL string
@@ -125,7 +135,7 @@ func (yt *YoutubeTranscript) FetchTranscript(videoId string, config *TranscriptC
 			for i, track := range captions.PlayerCaptionsTracklistRenderer.CaptionTracks {
 				availableLangs[i] = track.LanguageCode
 			}
-			return nil, &YoutubeTranscriptNotAvailableLanguageError{
+			return nil, "", &YoutubeTranscriptNotAvailableLanguageError{
 				YoutubeTranscriptError{Message: fmt.Sprintf("No transcripts are available in %s for this video (%s). Available languages: %s", config.Lang, videoId, strings.Join(availableLangs, ", "))},
 				config.Lang, availableLangs, videoId,
 			}
@@ -138,13 +148,13 @@ func (yt *YoutubeTranscript) FetchTranscript(videoId string, config *TranscriptC
 
 	transcriptResponse, err := http.Get(transcriptURL)
 	if err != nil {
-		return nil, &YoutubeTranscriptNotAvailableError{YoutubeTranscriptError{Message: fmt.Sprintf("No transcripts are available for this video (%s)", videoId)}, videoId}
+		return nil, "", &YoutubeTranscriptNotAvailableError{YoutubeTranscriptError{Message: fmt.Sprintf("No transcripts are available for this video (%s)", videoId)}, videoId}
 	}
 	defer transcriptResponse.Body.Close()
 
 	transcriptBody, err := ioutil.ReadAll(transcriptResponse.Body)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	re := regexp.MustCompile(RE_XML_TRANSCRIPT)
@@ -160,7 +170,7 @@ func (yt *YoutubeTranscript) FetchTranscript(videoId string, config *TranscriptC
 			Lang:     config.Lang,
 		})
 	}
-	return results, nil
+	return results, videoTitle, nil
 }
 
 func retrieveVideoId(videoId string) (string, error) {
@@ -175,11 +185,27 @@ func retrieveVideoId(videoId string) (string, error) {
 	return "", &YoutubeTranscriptError{Message: "Impossible to retrieve Youtube video ID."}
 }
 
+func sanitizeFilename(filename string) string {
+	// Replace or remove illegal characters
+	re := regexp.MustCompile(`[<>:"/\\|? *]`)
+	sanitized := re.ReplaceAllString(filename, "_")
+
+	// Remove leading/trailing spaces and dots
+	sanitized = strings.Trim(sanitized, " .")
+
+	// Limit the length to 200 characters
+	if len(sanitized) > 200 {
+		sanitized = sanitized[:200]
+	}
+
+	return sanitized
+}
+
 func main() {
 	// Define command line flags
 	videoId := flag.String("videoId", "", "YouTube video ID or URL")
 	lang := flag.String("lang", "en", "Language code for the transcript")
-	output := flag.String("output", "transcript.txt", "Output file path")
+	output := flag.String("output", "", "Output file path")
 	showText := flag.Bool("showText", true, "Show transcript text")
 	showDuration := flag.Bool("showDuration", true, "Show transcript duration")
 	showOffset := flag.Bool("showOffset", true, "Show transcript offset")
@@ -222,14 +248,23 @@ func main() {
 	}
 
 	yt := &YoutubeTranscript{}
-	transcripts, err := yt.FetchTranscript(*videoId, &TranscriptConfig{Lang: *lang})
+	transcripts, videoTitle, err := yt.FetchTranscript(*videoId, &TranscriptConfig{Lang: *lang})
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
 
+	// Determine output filename
+	var outputFilename string
+	if *output == "" {
+		sanitizedTitle := sanitizeFilename(videoTitle)
+		outputFilename = sanitizedTitle + ".txt"
+	} else {
+		outputFilename = *output
+	}
+
 	// Create or open the output file
-	file, err := os.Create(*output)
+	file, err := os.Create(outputFilename)
 	if err != nil {
 		fmt.Println("Error creating file:", err)
 		os.Exit(1)
@@ -279,5 +314,5 @@ func main() {
 		}
 	}
 
-	fmt.Println("Transcript saved to", *output)
+	fmt.Println("Transcript saved to", outputFilename)
 }
