@@ -50,7 +50,7 @@ To see all available options:
 
 - `-videoId`: YouTube video ID or URL (required)
 - `-lang`: Language code for the transcript (default: "en")
-- `-output`: Output file path (default: "transcript.txt")
+- `-output`: Output file path (default: will use sanitized video title with .txt extension, limited characters )
 - `-showText`: Show transcript text (default: true)
 - `-showDuration`: Show transcript duration (default: true)
 - `-showOffset`: Show transcript offset (default: true)
