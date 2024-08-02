@@ -207,11 +207,11 @@ func main() {
 	lang := flag.String("lang", "en", "Language code for the transcript")
 	output := flag.String("output", "", "Output file path")
 	showText := flag.Bool("showText", true, "Show transcript text")
-	showDuration := flag.Bool("showDuration", true, "Show transcript duration")
-	showOffset := flag.Bool("showOffset", true, "Show transcript offset")
-	showLang := flag.Bool("showLang", true, "Show transcript language")
+	showDuration := flag.Bool("showDuration", false, "Show transcript duration")
+	showOffset := flag.Bool("showOffset", false, "Show transcript offset")
+	showLang := flag.Bool("showLang", false, "Show transcript language")
 	disableAll := flag.Bool("disableAll", false, "Disable all transcript output fields")
-	noTextPrefix := flag.Bool("noTextPrefix", false, "Disable prefix 'Text: ' in front of transcript text")
+	noTextPrefix := flag.Bool("noTextPrefix", true, "Disable prefix 'Text: ' in front of transcript text")
 
 	// Custom usage message
 	flag.Usage = func() {
