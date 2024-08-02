@@ -52,11 +52,11 @@ To see all available options:
 - `-lang`: Language code for the transcript (default: "en")
 - `-output`: Output file path (default: will use sanitized video title with .txt extension, limited characters )
 - `-showText`: Show transcript text (default: true)
-- `-showDuration`: Show transcript duration (default: true)
-- `-showOffset`: Show transcript offset (default: true)
-- `-showLang`: Show transcript language (default: true)
+- `-showDuration`: Show transcript duration (default: false)
+- `-showOffset`: Show transcript offset (default: false)
+- `-showLang`: Show transcript language (default: false)
 - `-disableAll`: Disable all transcript output fields (default: false)
-- `-noTextPrefix`: Disable prefix 'Text: ' in front of transcript text (default: false)
+- `-noTextPrefix`: Disable prefix 'Text: ' in front of transcript text (default: true)
 
 ### Examples
 
