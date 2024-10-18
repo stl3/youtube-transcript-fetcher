@@ -87,11 +87,9 @@ func (yt *YoutubeTranscript) FetchTranscript(videoId string, config *TranscriptC
 	var videoTitle string
 	if len(titleMatch) > 1 {
 		videoTitle = string(titleMatch[1])
-// Decode HTML entities here
-	videoTitle = html.UnescapeString(videoTitle)
-	} else {
-		videoTitle = "Untitled Video"
-	}
+  // Decode HTML entities here
+	 videoTitle = html.UnescapeString(videoTitle)
+	} 
 
 	splittedHTML := strings.Split(string(videoPageBody), `"captions":`)
 	if len(splittedHTML) <= 1 {
@@ -279,13 +277,14 @@ func main() {
 	// Write transcripts to the file
 	for _, transcript := range transcripts {
 		if *showText {
+    decodedText := decodeHTML(transcript.Text)
 			prefix := "Text: "
 			suffix := "\n"
 			if *noTextPrefix {
 				prefix = ""
 				suffix = ""
 			}
-			_, err := file.WriteString(fmt.Sprintf("%s%s%s", prefix, transcript.Text, suffix))
+			_, err := file.WriteString(fmt.Sprintf("%s%s%s", prefix, decodedText, suffix))
 			if err != nil {
 				fmt.Println("Error writing to file:", err)
 				os.Exit(1)
@@ -320,4 +319,17 @@ func main() {
 	}
 
 	fmt.Println("Transcript saved to", outputFilename)
+}
+
+// Helper function to decode specific HTML entities
+func decodeHTML(text string) string {
+	// Replace specific encoded strings directly
+	text = strings.ReplaceAll(text, "&amp;#39;", "'") // Replace &amp;#39; with '
+	// text = strings.ReplaceAll(text, "&amp;", "&")    // Replace &amp; with &
+	// text = strings.ReplaceAll(text, "&quot;", "\"")  // Replace &quot; with "
+	// text = strings.ReplaceAll(text, "&apos;", "'")   // Replace &apos; with '
+	// text = strings.ReplaceAll(text, "&lt;", "<")     // Replace &lt; with <
+	// text = strings.ReplaceAll(text, "&gt;", ">")     // Replace &gt; with >
+
+	return text
 }
