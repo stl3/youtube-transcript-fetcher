@@ -87,6 +87,8 @@ func (yt *YoutubeTranscript) FetchTranscript(videoId string, config *TranscriptC
 	var videoTitle string
 	if len(titleMatch) > 1 {
 		videoTitle = string(titleMatch[1])
+// Decode HTML entities here
+	videoTitle = html.UnescapeString(videoTitle)
 	} else {
 		videoTitle = "Untitled Video"
 	}
@@ -186,6 +188,9 @@ func retrieveVideoId(videoId string) (string, error) {
 }
 
 func sanitizeFilename(filename string) string {
+	// Decode any HTML entities like "&amp;"
+	filename = html.UnescapeString(filename)
+	
 	// Replace or remove illegal characters
 	re := regexp.MustCompile(`[<>:"/\\|? *]`)
 	sanitized := re.ReplaceAllString(filename, "_")
